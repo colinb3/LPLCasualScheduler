@@ -2,38 +2,23 @@
  * Colin Brown
  **/
 
+import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import React, { useState } from "react";
 import Shifts from "./pages/Shifts";
+import Home from "./pages/Home";
+import { getDatabase } from "./db/sqlite";
 
 export default function AppRouter() {
-  const Router = BrowserRouter;
-  const routerProps = { basename: import.meta.env.BASE_URL };
-  const branches = [
-    "Beacock",
-    "Bostwick",
-    "Byron",
-    "Carson",
-    "Cherryhill",
-    "Childrens",
-    "CIF",
-    "Cherryhill",
-    "East London",
-    "Glanworth",
-    "Jalna",
-    "Lambeth",
-    "Landon",
-    "Lending",
-    "Masonville",
-    "Pond Mills",
-    "Sherwood",
-    "Stoney Creek",
-  ];
+  React.useEffect(() => {
+    void getDatabase();
+  }, []);
+
   return (
-    <Router {...routerProps}>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
-        <Route path="/" element={<Shifts branches={branches} />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/shifts" element={<Shifts />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 }
