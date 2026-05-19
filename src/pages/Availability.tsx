@@ -14,9 +14,6 @@ import {
   Grid,
   Stack,
   Typography,
-  IconButton,
-  Tooltip,
-  TextField,
   Avatar,
   FormControl,
   FormControlLabel,
@@ -26,7 +23,7 @@ import {
   Divider,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
-import DeleteIcon from "@mui/icons-material/Delete";
+//import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import { Link as RouterLink } from "react-router-dom";
 import type { Dayjs } from "dayjs";
@@ -38,6 +35,7 @@ type CasualRow = {
 };
 
 type AvailabilityRow = {
+  id: number;
   casualId: number;
   shiftDate: string;
   startTime: string;
@@ -109,7 +107,9 @@ export default function Availability({
       try {
         const rows = await queryRows<AvailabilityRow>(
           `
-            SELECT Available.casual_id AS casualId, 
+            SELECT 
+            Available.id AS id, 
+            Available.casual_id AS casualId, 
             Shift.date AS shiftDate,
             Shift.start_time AS startTime, 
             Shift.end_time AS endTime, 
@@ -163,12 +163,12 @@ export default function Availability({
     setAddAvailDialogOpen(true);
   };
 
-  const handleOpenAddAvailabilitySortShift = (shiftId: number) => {
+  /*const handleOpenAddAvailabilitySortShift = (shiftId: number) => {
     setSelectedCasualId(null);
     setSelectedShiftId(shiftId);
     setSaveError(null);
     setAddAvailDialogOpen(true);
-  };
+  };*/
 
   const handleCloseDialog = () => {
     setAddAvailDialogOpen(false);
@@ -246,6 +246,9 @@ export default function Availability({
             <RadioGroup
               aria-labelledby="display-by-label"
               value={displayBy}
+              onChange={(e) =>
+                setDisplayBy(e.target.value as "casual" | "shift")
+              }
               row
             >
               <FormControlLabel
@@ -323,6 +326,18 @@ export default function Availability({
                   </Box>
                 </Stack>
                 <Divider sx={{ mt: 1.5, mb: 0.5, color: "b" }} />
+                <Stack direction={"column"} spacing={0.5} sx={{ mt: 0.5 }}>
+                  {availabilities
+                    .filter((a) => a.casualId === casual.id)
+                    .map((availability) => (
+                      <Box key={availability.id} sx={{ py: 0.5 }}>
+                        <Typography variant="body2">
+                          {availability.shiftDate}: {availability.startTime} -{" "}
+                          {availability.endTime}
+                        </Typography>
+                      </Box>
+                    ))}
+                </Stack>
               </Box>
             </Grid>
           ))}
