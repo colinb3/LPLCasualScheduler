@@ -24,13 +24,18 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import { Link as RouterLink } from "react-router-dom";
 import { queryRows, runSql } from "../db/sqlite";
+import type { Dayjs } from "dayjs";
 
 type CasualRow = {
   id: number;
   name: string;
 };
 
-export default function Casuals() {
+export default function Casuals({
+  selectedWeekStart,
+}: {
+  selectedWeekStart: Dayjs | null;
+}) {
   const [casuals, setCasuals] = React.useState<CasualRow[]>([]);
   const [addCasualDialogOpen, setAddCasualDialogOpen] =
     React.useState<boolean>(false);
@@ -140,17 +145,43 @@ export default function Casuals() {
     }
   };
 
+  const getWeekStart = (date: Dayjs | null) => {
+    if (!date) {
+      return null;
+    }
+
+    const monday = date.clone().startOf("week").add(1, "day");
+
+    return date.day() === 0 ? monday.subtract(7, "day") : monday;
+  };
+
   return (
     <>
       <Box sx={{ padding: 1 }}>
-        <Button
-          sx={{ mb: 1 }}
-          component={RouterLink}
-          to="/"
-          startIcon={<HomeIcon />}
+        <Stack
+          direction={"row"}
+          sx={{
+            spacing: 1,
+            mb: 1,
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
         >
-          Home
-        </Button>
+          <Button
+            sx={{ mb: 1 }}
+            component={RouterLink}
+            to="/"
+            startIcon={<HomeIcon />}
+          >
+            Home
+          </Button>
+          {selectedWeekStart && getWeekStart(selectedWeekStart) && (
+            <Typography sx={{ whiteSpace: "nowrap" }}>
+              Week: {getWeekStart(selectedWeekStart)?.format("MMM D")} -{" "}
+              {getWeekStart(selectedWeekStart)?.add(6, "day").format("MMM D")}
+            </Typography>
+          )}
+        </Stack>
         <Stack
           direction={"row"}
           sx={{ justifyContent: "space-between", spacing: 2, mb: 2 }}
@@ -171,65 +202,68 @@ export default function Casuals() {
             {errorMsg}
           </Typography>
         ) : null}
-
-        <Grid container spacing={2}>
-          {casuals.map((casual) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={casual.id}>
-              <Box
-                sx={{
-                  border: "solid",
-                  borderWidth: "1px",
-                  borderColor: "primary.secondary",
-                  borderRadius: "3px",
-                  padding: "10px",
-                }}
-              >
-                <Stack
-                  direction={"row"}
-                  spacing={1}
+        {casuals.length === 0 ? (
+          <Typography>Click "+ Casual" to add your first casual.</Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {casuals.map((casual) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={casual.id}>
+                <Box
                   sx={{
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    border: "solid",
+                    borderWidth: "1px",
+                    borderColor: "primary.secondary",
+                    borderRadius: "3px",
+                    padding: "10px",
                   }}
                 >
                   <Stack
                     direction={"row"}
-                    spacing={1.5}
+                    spacing={1}
                     sx={{
                       alignItems: "center",
+                      justifyContent: "space-between",
                     }}
                   >
-                    <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
-                      {casual.name.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Typography
-                      variant="body1"
+                    <Stack
+                      direction={"row"}
+                      spacing={1.5}
                       sx={{
-                        minWidth: 0,
-                        flex: 1,
-                        overflowWrap: "anywhere",
-                        whiteSpace: "normal",
+                        alignItems: "center",
                       }}
                     >
-                      {casual.name}
-                    </Typography>
+                      <Avatar sx={{ width: 40, height: 40, flexShrink: 0 }}>
+                        {casual.name.charAt(0).toUpperCase()}
+                      </Avatar>
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          minWidth: 0,
+                          flex: 1,
+                          overflowWrap: "anywhere",
+                          whiteSpace: "normal",
+                        }}
+                      >
+                        {casual.name}
+                      </Typography>
+                    </Stack>
+                    <Tooltip title="Remove Casual">
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          handleRemoveCasual(casual.id);
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
                   </Stack>
-                  <Tooltip title="Remove Casual">
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => {
-                        handleRemoveCasual(casual.id);
-                      }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-              </Box>
-            </Grid>
-          ))}
-        </Grid>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
         <Dialog open={addCasualDialogOpen} onClose={handleCloseDialog}>
           <DialogTitle>Add Casual</DialogTitle>

@@ -287,9 +287,16 @@ export default function Shifts({
     }
   };
 
-  const handleOpenAddShift = (branchId: number) => {
+  const handleOpenAddShiftSortBranch = (branchId: number) => {
     setSelectedBranchId(branchId);
     setSelectedWeekDay(null);
+    setSaveError(null);
+    setAddShiftDialogOpen(true);
+  };
+
+  const handleOpenAddShiftSortDay = (day: Dayjs) => {
+    setSelectedBranchId(null);
+    setSelectedWeekDay(day);
     setSaveError(null);
     setAddShiftDialogOpen(true);
   };
@@ -400,30 +407,40 @@ export default function Shifts({
     setAddShiftDialogOpen(false);
     setSaveError(null);
     setSelectedWeekDay(null);
+    setSelectedBranchId(null);
   };
 
   return (
     <>
       <Box sx={{ padding: 1 }}>
-        <Button
-          sx={{ mb: 1 }}
-          component={RouterLink}
-          to="/"
-          startIcon={<HomeIcon />}
+        <Stack
+          direction={"row"}
+          sx={{
+            spacing: 1,
+            mb: 1,
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
         >
-          Home
-        </Button>
+          <Button component={RouterLink} to="/" startIcon={<HomeIcon />}>
+            Home
+          </Button>
+          {selectedWeekStart && getWeekStart(selectedWeekStart) && (
+            <Typography sx={{ whiteSpace: "nowrap" }}>
+              Week: {getWeekStart(selectedWeekStart)?.format("MMM D")} -{" "}
+              {getWeekStart(selectedWeekStart)?.add(6, "day").format("MMM D")}
+            </Typography>
+          )}
+        </Stack>
         <Stack
           direction="row"
           sx={{ justifyContent: "space-between", spacing: 2, mb: 2 }}
         >
           <Stack direction={"column"}>
-            <Typography variant="h4">Shifts</Typography>
-            <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
-              Selected Week: {getWeekStart(selectedWeekStart)?.format("MMM D")}{" "}
-              - {getWeekStart(selectedWeekStart)?.add(6, "day").format("MMM D")}
+            <Typography variant="h4" sx={{ mb: 0 }}>
+              Shifts
             </Typography>
-            <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+            <Typography variant="body1" sx={{ whiteSpace: "nowrap" }}>
               Shifts this week:{" "}
               {shiftCount !== null ? shiftCount : "Loading..."}
             </Typography>
@@ -494,7 +511,7 @@ export default function Shifts({
                     <Box>
                       <Button
                         variant="contained"
-                        onClick={() => handleOpenAddShift(branch.id)}
+                        onClick={() => handleOpenAddShiftSortBranch(branch.id)}
                         startIcon={<AddIcon />}
                         size="small"
                       >
@@ -576,13 +593,7 @@ export default function Shifts({
                       <Box>
                         <Button
                           variant="contained"
-                          onClick={() => {
-                            // open dialog to add shift to a branch on this date
-                            setSelectedWeekDay(day);
-                            setSelectedBranchId(null);
-                            setSaveError(null);
-                            setAddShiftDialogOpen(true);
-                          }}
+                          onClick={() => handleOpenAddShiftSortDay(day)}
                           startIcon={<AddIcon />}
                           size="small"
                         >

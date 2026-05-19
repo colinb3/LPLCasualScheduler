@@ -38,7 +38,10 @@ export default function AppRouter() {
           path="/shifts"
           element={<Shifts selectedWeekStart={selectedWeekStart} />}
         />
-        <Route path="/casuals" element={<Casuals />} />
+        <Route
+          path="/casuals"
+          element={<Casuals selectedWeekStart={selectedWeekStart} />}
+        />
         <Route
           path="/availability"
           element={<Availability selectedWeekStart={selectedWeekStart} />}

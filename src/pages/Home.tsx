@@ -56,7 +56,7 @@ export default function Home({
         </LocalizationProvider>
         {selectedWeekStart && getWeekStart(selectedWeekStart) && (
           <Stack direction={"column"}>
-            <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+            <Typography variant="body1" sx={{ whiteSpace: "nowrap" }}>
               Selected Week: {getWeekStart(selectedWeekStart)?.format("MMM D")}{" "}
               - {getWeekStart(selectedWeekStart)?.add(6, "day").format("MMM D")}
             </Typography>
