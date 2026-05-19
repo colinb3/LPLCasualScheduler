@@ -10,7 +10,6 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { Link as RouterLink } from "react-router-dom";
 import type { Dayjs } from "dayjs";
-//import { queryRows, runSql } from "../db/sqlite";
 
 export default function Home({
   selectedDate,

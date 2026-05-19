@@ -491,14 +491,16 @@ export default function Shifts({
                           : "s"}
                       </Typography>
                     </Stack>
-                    <Button
-                      variant="contained"
-                      onClick={() => handleOpenAddShift(branch.id)}
-                      startIcon={<AddIcon />}
-                      size="small"
-                    >
-                      Shift
-                    </Button>
+                    <Box>
+                      <Button
+                        variant="contained"
+                        onClick={() => handleOpenAddShift(branch.id)}
+                        startIcon={<AddIcon />}
+                        size="small"
+                      >
+                        Shift
+                      </Button>
+                    </Box>
                   </Stack>
                   {branchCounts.find((bc) => bc.id === branch.id)
                     ?.shiftCount && (
@@ -571,22 +573,26 @@ export default function Shifts({
                           {shiftsForDate.length === 1 ? "" : "s"}
                         </Typography>
                       </Stack>
-                      <Button
-                        variant="contained"
-                        onClick={() => {
-                          // open dialog to add shift to a branch on this date
-                          setSelectedWeekDay(day);
-                          setSelectedBranchId(null);
-                          setSaveError(null);
-                          setAddShiftDialogOpen(true);
-                        }}
-                        startIcon={<AddIcon />}
-                        size="small"
-                      >
-                        Shift
-                      </Button>
+                      <Box>
+                        <Button
+                          variant="contained"
+                          onClick={() => {
+                            // open dialog to add shift to a branch on this date
+                            setSelectedWeekDay(day);
+                            setSelectedBranchId(null);
+                            setSaveError(null);
+                            setAddShiftDialogOpen(true);
+                          }}
+                          startIcon={<AddIcon />}
+                          size="small"
+                        >
+                          Shift
+                        </Button>
+                      </Box>
                     </Stack>
-                    <Divider sx={{ mt: 1.5, mb: 0.5, color: "b" }} />
+                    {shiftsForDate.length > 0 && (
+                      <Divider sx={{ mt: 1.5, mb: 0.5, color: "border" }} />
+                    )}
                     <Box>
                       {shiftsForDate.map((shift) => (
                         <React.Fragment key={shift.id}>

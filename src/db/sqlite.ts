@@ -1,8 +1,8 @@
 import initSqlJs, { type Database as SqlJsDatabase, type SqlJsStatic } from "sql.js";
 import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
-import databaseUrl from "./lpl-casual-scheduler.db?url";
+import databaseUrl from "./casual-scheduler.db?url";
 
-const STORAGE_KEY = "lpl-casual-scheduler-db";
+const STORAGE_KEY = "casual-scheduler-db";
 
 type SqlRow = Record<string, unknown>;
 
