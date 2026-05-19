@@ -8,8 +8,6 @@ CREATE TABLE Branch (
     name TEXT NOT NULL
 );
 
-DROP TABLE Shift;
-
 CREATE TABLE Shift (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date DATE NOT NULL,
@@ -19,14 +17,12 @@ CREATE TABLE Shift (
     FOREIGN KEY (branch_id) REFERENCES Branch(id)
 );
 
-SELECT * FROM Shift;
-
 CREATE TABLE Available (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     casual_id INTEGER NOT NULL,
     shift_id INTEGER NOT NULL,
-    FOREIGN KEY (casual_id) REFERENCES Casual(id),
-    FOREIGN KEY (shift_id) REFERENCES Shift(id)
+    FOREIGN KEY (casual_id) REFERENCES Casual(id) ON DELETE CASCADE,
+    FOREIGN KEY (shift_id) REFERENCES Shift(id) ON DELETE CASCADE
 );
 
 INSERT INTO Branch (name) VALUES 

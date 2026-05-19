@@ -1,5 +1,6 @@
-/** Shifts.tsx
- * Colin Brown
+/**
+ * Shifts.tsx
+ * Colin Brown May 10, 2026
  */
 
 import React from "react";
@@ -7,6 +8,8 @@ import {
   Box,
   Button,
   Chip,
+  Select,
+  MenuItem,
   Dialog,
   DialogActions,
   DialogContent,
@@ -23,7 +26,6 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import dayjs, { Dayjs } from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -31,27 +33,42 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import HomeIcon from "@mui/icons-material/Home";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import { Link as RouterLink } from "react-router-dom";
 import { queryRows, runSql } from "../db/sqlite";
 
 type BranchRow = {
   id: number;
   name: string;
+};
+
+type BranchShiftCountRow = {
+  id: number;
   shiftCount: number;
 };
 
 type ShiftRow = {
   id: number;
   branch_id: number;
-  date: Date;
-  start: Date;
-  end: Date;
+  date: string;
+  startTime: string;
+  endTime: string;
 };
 
-export default function Shifts() {
-  const [weekDate, setWeekDate] = React.useState<Dayjs | null>(dayjs());
+type ShiftCountRow = {
+  shiftCount: number;
+};
+
+export default function Shifts({
+  selectedWeekStart,
+}: {
+  selectedWeekStart: Dayjs | null;
+}) {
   const [branches, setBranches] = React.useState<BranchRow[]>([]);
+  const [branchCounts, setBranchCounts] = React.useState<BranchShiftCountRow[]>(
+    [],
+  );
   const [shifts, setShifts] = React.useState<ShiftRow[]>([]);
-  const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [addShiftDialogOpen, setAddShiftDialogOpen] = React.useState(false);
   const [selectedBranchId, setSelectedBranchId] = React.useState<number | null>(
     null,
@@ -65,32 +82,84 @@ export default function Shifts() {
   const [shiftEndTime, setShiftEndTime] = React.useState<Dayjs | null>(dayjs());
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [shiftCount, setShiftCount] = React.useState<number | null>(null);
+  const [displayBy, setDisplayBy] = React.useState<"branch" | "date">(
+    () =>
+      (localStorage.getItem("shiftsDisplayBy") as "branch" | "date") ||
+      "branch",
+  );
+
+  React.useEffect(() => {
+    async function loadShiftCount() {
+      try {
+        const shiftCountRows = await queryRows<ShiftCountRow>(
+          `
+              SELECT count(id) AS shiftCount 
+              FROM shift 
+              WHERE date > ? AND date < ?;
+            `,
+          [
+            getWeekStart(selectedWeekStart)?.format("YYYY-MM-DD"),
+            getWeekStart(selectedWeekStart)?.add(7, "day").format("YYYY-MM-DD"),
+          ],
+        );
+        setShiftCount(shiftCountRows[0].shiftCount);
+      } catch (error) {
+        console.error("Error refreshing data:", error);
+      }
+    }
+
+    void loadShiftCount();
+  }, [selectedWeekStart]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("shiftsDisplayBy", displayBy);
+    } catch (e) {
+      // ignore
+    }
+  }, [displayBy]);
 
   React.useEffect(() => {
     let isActive = true;
 
     async function loadBranches() {
       try {
-        const rows = await queryRows<BranchRow>(
+        const branchRows = await queryRows<BranchRow>(
           `
             SELECT
-              Branch.id,
-              Branch.name,
-              COUNT(Shift.id) AS shiftCount
+              id,
+              name
             FROM Branch
-            LEFT JOIN Shift ON Shift.branch_id = Branch.id
-            GROUP BY Branch.id, Branch.name
             ORDER BY Branch.name
           `,
         );
 
+        const branchCountRows = await queryRows<BranchShiftCountRow>(
+          `
+            SELECT
+              Branch.id,
+              COUNT(Shift.id) AS shiftCount
+            FROM Branch
+            LEFT JOIN Shift ON Shift.branch_id = Branch.id
+            WHERE date >= ? AND date < ?
+            GROUP BY Branch.id, Branch.name
+            ORDER BY Branch.name
+        `,
+          [
+            getWeekStart(selectedWeekStart)?.format("YYYY-MM-DD"),
+            getWeekStart(selectedWeekStart)?.add(7, "day").format("YYYY-MM-DD"),
+          ],
+        );
+
         if (isActive) {
-          setBranches(rows);
-          setLoadError(null);
+          setBranches(branchRows);
+          setBranchCounts(branchCountRows);
+          setErrorMsg(null);
         }
       } catch (error) {
         if (isActive) {
-          setLoadError(
+          setErrorMsg(
             error instanceof Error ? error.message : "Failed to load branches",
           );
         }
@@ -102,7 +171,7 @@ export default function Shifts() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [selectedWeekStart]);
 
   React.useEffect(() => {
     let isActive = true;
@@ -114,20 +183,26 @@ export default function Shifts() {
             SELECT
               id,
               date,
-              start_time,
-              end_time,
+              start_time AS startTime,
+              end_time AS endTime,
               branch_id
             FROM Shift
+            WHERE date >= ? AND date < ?
+            ORDER BY date, start_time
           `,
+          [
+            getWeekStart(selectedWeekStart)?.format("YYYY-MM-DD"),
+            getWeekStart(selectedWeekStart)?.add(7, "day").format("YYYY-MM-DD"),
+          ],
         );
 
         if (isActive) {
           setShifts(rows);
-          setLoadError(null);
+          setErrorMsg(null);
         }
       } catch (error) {
         if (isActive) {
-          setLoadError(
+          setErrorMsg(
             error instanceof Error ? error.message : "Failed to load shifts",
           );
         }
@@ -140,35 +215,76 @@ export default function Shifts() {
       isActive = false;
       console.log(shifts);
     };
-  }, []);
+  }, [selectedWeekStart]);
 
+  // Refresh the branchs and shifts shown, would ideally be in a try/catch statement
   const refreshData = async () => {
-    const branchRows = await queryRows<BranchRow>(
-      `
+    try {
+      const branchRows = await queryRows<BranchRow>(
+        `
           SELECT
-            Branch.id,
-            Branch.name,
-            COUNT(Shift.id) AS shiftCount
+            id,
+            name
           FROM Branch
-          LEFT JOIN Shift ON Shift.branch_id = Branch.id
-          GROUP BY Branch.id, Branch.name
           ORDER BY Branch.name
         `,
-    );
-    setBranches(branchRows);
+      );
+      setBranches(branchRows);
 
-    const shiftRows = await queryRows<ShiftRow>(
-      `
+      const branchCountRows = await queryRows<BranchShiftCountRow>(
+        `
+            SELECT
+              Branch.id,
+              COUNT(Shift.id) AS shiftCount
+            FROM Branch
+            LEFT JOIN Shift ON Shift.branch_id = Branch.id
+            WHERE date >= ? AND date < ?
+            GROUP BY Branch.id, Branch.name
+            ORDER BY Branch.name
+        `,
+        [
+          getWeekStart(selectedWeekStart)?.format("YYYY-MM-DD"),
+          getWeekStart(selectedWeekStart)?.add(7, "day").format("YYYY-MM-DD"),
+        ],
+      );
+      setBranchCounts(branchCountRows);
+
+      const shiftRows = await queryRows<ShiftRow>(
+        `
             SELECT
               id,
               date,
-              start_time,
-              end_time,
+              start_time AS startTime,
+              end_time AS endTime,
               branch_id
             FROM Shift
+            WHERE date >= ? AND date < ?
+            ORDER BY date, start_time
           `,
-    );
-    setShifts(shiftRows);
+        [
+          getWeekStart(selectedWeekStart)?.format("YYYY-MM-DD"),
+          getWeekStart(selectedWeekStart)?.add(7, "day").format("YYYY-MM-DD"),
+        ],
+      );
+      setShifts(shiftRows);
+
+      const shiftCountRows = await queryRows<ShiftCountRow>(
+        `
+              SELECT count(id) AS shiftCount FROM Shift WHERE date > ? AND date < ?;
+            `,
+        [
+          getWeekStart(selectedWeekStart)?.format("YYYY-MM-DD"),
+          getWeekStart(selectedWeekStart)?.add(7, "day").format("YYYY-MM-DD"),
+        ],
+      );
+      setShiftCount(shiftCountRows[0].shiftCount);
+    } catch (error) {
+      setErrorMsg(
+        error instanceof Error
+          ? "Database refresh error: " + error.message
+          : "Database error. Failed to refresh data.",
+      );
+    }
   };
 
   const handleOpenAddShift = (branchId: number) => {
@@ -204,9 +320,35 @@ export default function Shifts() {
     return days;
   };
 
+  const formatShiftTime = (time: string) => {
+    const [hourText, minuteText] = time.split(":");
+    const hour = Number(hourText);
+    const minute = Number(minuteText);
+
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+      return time;
+    }
+
+    const hour12 = hour % 12 || 12;
+    const period = hour < 12 ? "AM" : "PM";
+    const paddedMinute = minute.toString().padStart(2, "0");
+
+    return `${hour12}:${paddedMinute} ${period}`;
+  };
+
   const handleAddShift = async () => {
-    if (!selectedBranchId || !selectedWeekDay) {
-      setSaveError("Please select a day");
+    if (
+      !selectedBranchId ||
+      !selectedWeekDay ||
+      !shiftStartTime ||
+      !shiftEndTime
+    ) {
+      setSaveError("Please select a day and both times");
+      return;
+    }
+
+    if (shiftEndTime.isBefore(shiftStartTime)) {
+      setSaveError("Shift end time must be after the start time");
       return;
     }
 
@@ -215,8 +357,8 @@ export default function Shifts() {
 
     try {
       const shiftDateStr = selectedWeekDay.format("YYYY-MM-DD");
-      const shiftStartStr = shiftStartTime?.format("HH:mm");
-      const shiftEndStr = shiftEndTime?.format("HH:mm");
+      const shiftStartStr = shiftStartTime.format("HH:mm");
+      const shiftEndStr = shiftEndTime.format("HH:mm");
       await runSql(
         `
           INSERT INTO Shift (date, start_time, end_time, branch_id)
@@ -248,7 +390,7 @@ export default function Shifts() {
 
       refreshData();
     } catch (error) {
-      setLoadError(
+      setErrorMsg(
         error instanceof Error ? error.message : "Failed to remove shift",
       );
     }
@@ -263,21 +405,37 @@ export default function Shifts() {
   return (
     <>
       <Box sx={{ padding: 1 }}>
-        <Button sx={{ mb: 1 }} href="/" startIcon={<HomeIcon />}>
+        <Button
+          sx={{ mb: 1 }}
+          component={RouterLink}
+          to="/"
+          startIcon={<HomeIcon />}
+        >
           Home
         </Button>
         <Stack
           direction="row"
           sx={{ justifyContent: "space-between", spacing: 2, mb: 2 }}
         >
-          <Typography variant="h4">Shifts</Typography>
-
+          <Stack direction={"column"}>
+            <Typography variant="h4">Shifts</Typography>
+            <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+              Selected Week: {getWeekStart(selectedWeekStart)?.format("MMM D")}{" "}
+              - {getWeekStart(selectedWeekStart)?.add(6, "day").format("MMM D")}
+            </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+              Shifts this week:{" "}
+              {shiftCount !== null ? shiftCount : "Loading..."}
+            </Typography>
+          </Stack>
           <FormControl>
             <FormLabel id="display-by-label">Display by:</FormLabel>
             <RadioGroup
               aria-labelledby="display-by-label"
-              defaultValue={"branch"}
-              onChange={() => {}}
+              value={displayBy}
+              onChange={(e) =>
+                setDisplayBy(e.target.value as "branch" | "date")
+              }
               row
             >
               <FormControlLabel
@@ -291,76 +449,65 @@ export default function Shifts() {
         </Stack>
 
         <Box sx={{ mb: 2 }}>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <DatePicker
-                label="Select Week"
-                value={weekDate}
-                onChange={(newValue) => setWeekDate(newValue)}
-              />
-              {weekDate && getWeekStart(weekDate) && (
-                <Stack direction={"column"}>
-                  <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
-                    Week: {getWeekStart(weekDate)?.format("MMM D")} -{" "}
-                    {getWeekStart(weekDate)?.add(6, "day").format("MMM D")}
-                  </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
-                    Shifts this week: N/A
-                  </Typography>
-                </Stack>
-              )}
-            </Stack>
-          </LocalizationProvider>
+          <LocalizationProvider
+            dateAdapter={AdapterDayjs}
+          ></LocalizationProvider>
         </Box>
 
-        {loadError ? (
+        {errorMsg ? (
           <Typography color="error" sx={{ mb: 2 }}>
-            {loadError}
+            {errorMsg}
           </Typography>
         ) : null}
 
-        <Grid container spacing={2}>
-          {branches.map((branch) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={branch.id}>
-              <Box
-                sx={{
-                  border: "solid",
-                  borderWidth: "1px",
-                  borderColor: "primary.secondary",
-                  borderRadius: "3px",
-                  padding: "10px",
-                }}
-              >
-                <Stack
-                  direction={"row"}
-                  sx={{ spacing: 2, justifyContent: "space-between" }}
+        {displayBy === "branch" ? (
+          <Grid container spacing={2}>
+            {branches.map((branch) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={branch.id}>
+                <Box
+                  sx={{
+                    border: "solid",
+                    borderWidth: "1px",
+                    borderColor: "primary.secondary",
+                    borderRadius: "3px",
+                    padding: "10px",
+                  }}
                 >
-                  <Stack direction={"column"}>
-                    <Typography sx={{ fontWeight: "3em" }}>
-                      {branch.name}
-                    </Typography>
-                    <Typography variant="body2">
-                      {branch.shiftCount} scheduled shift
-                      {branch.shiftCount === 1 ? "" : "s"}
-                    </Typography>
-                  </Stack>
-                  <Button
-                    variant="contained"
-                    onClick={() => handleOpenAddShift(branch.id)}
-                    startIcon={<AddIcon />}
-                    size="small"
+                  <Stack
+                    direction={"row"}
+                    sx={{ spacing: 2, justifyContent: "space-between" }}
                   >
-                    Shift
-                  </Button>
-                </Stack>
-                {branch.shiftCount > 0 && (
-                  <Divider sx={{ mt: 1.5, mb: 0.5, color: "b" }} />
-                )}
-                <Box>
-                  {shifts.map((shift) => (
-                    <>
-                      {branch.id === shift.branch_id && (
-                        <>
+                    <Stack direction={"column"}>
+                      <Typography sx={{ fontWeight: "3em" }}>
+                        {branch.name}
+                      </Typography>
+                      <Typography variant="body2">
+                        {branchCounts.find((bc) => bc.id === branch.id)
+                          ?.shiftCount || 0}{" "}
+                        scheduled shift
+                        {(branchCounts.find((bc) => bc.id === branch.id)
+                          ?.shiftCount || 0) === 1
+                          ? ""
+                          : "s"}
+                      </Typography>
+                    </Stack>
+                    <Button
+                      variant="contained"
+                      onClick={() => handleOpenAddShift(branch.id)}
+                      startIcon={<AddIcon />}
+                      size="small"
+                    >
+                      Shift
+                    </Button>
+                  </Stack>
+                  {branchCounts.find((bc) => bc.id === branch.id)
+                    ?.shiftCount && (
+                    <Divider sx={{ mt: 1.5, mb: 0.5, color: "b" }} />
+                  )}
+                  <Box>
+                    {shifts.map((shift) => (
+                      <React.Fragment key={shift.id}>
+                        {branch.id === shift.branch_id && (
                           <Stack
                             direction={"row"}
                             sx={{
@@ -368,20 +515,13 @@ export default function Shifts() {
                               alignItems: "center",
                             }}
                           >
-                            <Stack direction={"row"} spacing={1}>
-                              <Typography variant="body1">
-                                {shift.id}
-                              </Typography>
-                              <Typography variant="body1">
-                                {shift.date}
-                              </Typography>
-                              <Typography variant="body1">
-                                {shift.start}
-                              </Typography>
-                              <Typography variant="body1">
-                                {shift.end}
-                              </Typography>
-                            </Stack>
+                            <Typography variant="body2">
+                              {dayjs(shift.date).format("ddd MMM D")}
+                              {": "}
+                              {formatShiftTime(shift.startTime)}
+                              {" - "}
+                              {formatShiftTime(shift.endTime)}
+                            </Typography>
                             <Tooltip title="Remove Shift">
                               <IconButton
                                 size="small"
@@ -394,15 +534,98 @@ export default function Shifts() {
                               </IconButton>
                             </Tooltip>
                           </Stack>
-                        </>
-                      )}
-                    </>
-                  ))}
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </Box>
                 </Box>
-              </Box>
-            </Grid>
-          ))}
-        </Grid>
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          <Grid container spacing={2}>
+            {getWeekDays(selectedWeekStart).map((day) => {
+              const dateKey = day.format("YYYY-MM-DD");
+              const shiftsForDate = shifts.filter((s) => s.date === dateKey);
+              return (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={dateKey}>
+                  <Box
+                    sx={{
+                      border: "solid",
+                      borderWidth: "1px",
+                      borderColor: "primary.secondary",
+                      borderRadius: "3px",
+                      padding: "10px",
+                    }}
+                  >
+                    <Stack
+                      direction={"row"}
+                      sx={{ spacing: 2, justifyContent: "space-between" }}
+                    >
+                      <Stack direction={"column"}>
+                        <Typography sx={{ fontWeight: "3em" }}>
+                          {day.format("ddd MMM D")}
+                        </Typography>
+                        <Typography variant="body2">
+                          {shiftsForDate.length} scheduled shift
+                          {shiftsForDate.length === 1 ? "" : "s"}
+                        </Typography>
+                      </Stack>
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          // open dialog to add shift to a branch on this date
+                          setSelectedWeekDay(day);
+                          setSelectedBranchId(null);
+                          setSaveError(null);
+                          setAddShiftDialogOpen(true);
+                        }}
+                        startIcon={<AddIcon />}
+                        size="small"
+                      >
+                        Shift
+                      </Button>
+                    </Stack>
+                    <Divider sx={{ mt: 1.5, mb: 0.5, color: "b" }} />
+                    <Box>
+                      {shiftsForDate.map((shift) => (
+                        <React.Fragment key={shift.id}>
+                          <Stack
+                            direction={"row"}
+                            sx={{
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mt: 1,
+                            }}
+                          >
+                            <Typography variant="body2">
+                              {formatShiftTime(shift.startTime)} -{" "}
+                              {formatShiftTime(shift.endTime)} (
+                              {branches.find((b) => b.id === shift.branch_id)
+                                ?.name || "Branch"}
+                              )
+                            </Typography>
+                            <Tooltip title="Remove Shift">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => {
+                                  handleRemoveShift(shift.id);
+                                }}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </React.Fragment>
+                      ))}
+                    </Box>
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
         <Dialog open={addShiftDialogOpen} onClose={handleCloseDialog}>
           <DialogTitle>
             Add Shift to{" "}
@@ -414,38 +637,62 @@ export default function Shifts() {
             <Box sx={{ py: 1 }}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <Stack direction={"column"} spacing={2}>
-                  <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                    Select Day of Week
-                  </Typography>
-                  <Stack
-                    direction="row"
-                    sx={{
-                      flexWrap: "wrap",
-                      gap: "4px",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    {getWeekDays(weekDate).map((day) => (
-                      <Chip
-                        key={day.format("YYYY-MM-DD")}
-                        label={day.format("ddd MMM D")}
-                        onClick={() => setSelectedWeekDay(day)}
-                        variant={
-                          selectedWeekDay?.format("YYYY-MM-DD") ===
-                          day.format("YYYY-MM-DD")
-                            ? "filled"
-                            : "outlined"
+                  {displayBy === "branch" ? (
+                    <>
+                      <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                        Select Day of Week
+                      </Typography>
+                      <Stack
+                        direction="row"
+                        sx={{
+                          flexWrap: "wrap",
+                          gap: "4px",
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        {getWeekDays(selectedWeekStart).map((day) => (
+                          <Chip
+                            key={day.format("YYYY-MM-DD")}
+                            label={day.format("ddd MMM D")}
+                            onClick={() => setSelectedWeekDay(day)}
+                            variant={
+                              selectedWeekDay?.format("YYYY-MM-DD") ===
+                              day.format("YYYY-MM-DD")
+                                ? "filled"
+                                : "outlined"
+                            }
+                            color={
+                              selectedWeekDay?.format("YYYY-MM-DD") ===
+                              day.format("YYYY-MM-DD")
+                                ? "primary"
+                                : "default"
+                            }
+                            sx={{}}
+                          />
+                        ))}
+                      </Stack>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                        Select Branch for {selectedWeekDay?.format("ddd MMM D")}
+                      </Typography>
+                      <Select
+                        value={selectedBranchId ?? ""}
+                        onChange={(e) =>
+                          setSelectedBranchId(Number(e.target.value))
                         }
-                        color={
-                          selectedWeekDay?.format("YYYY-MM-DD") ===
-                          day.format("YYYY-MM-DD")
-                            ? "primary"
-                            : "default"
-                        }
-                        sx={{}}
-                      />
-                    ))}
-                  </Stack>
+                        displayEmpty
+                      >
+                        <MenuItem value="">Choose branch</MenuItem>
+                        {branches.map((b) => (
+                          <MenuItem key={b.id} value={b.id}>
+                            {b.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </>
+                  )}
                   <TimePicker
                     label="Shift Start Time"
                     value={shiftStartTime}
