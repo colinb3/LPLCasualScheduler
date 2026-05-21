@@ -233,6 +233,10 @@ export default function Schedule({
     return `${hours}h ${remainingMinutes}m`;
   };
 
+  const unassignedCount = React.useMemo(() => {
+    return scheduleRows.filter((r) => !r.casualId).length;
+  }, [scheduleRows]);
+
   const generateSchedule = async () => {
     const monday = getMondayString();
 
@@ -552,6 +556,12 @@ export default function Schedule({
               <Typography variant="h6" sx={{ mb: 1.5 }}>
                 Schedule Stats
               </Typography>
+              {unassignedCount > 0 && (
+                <Typography color="error" sx={{ mb: 1 }}>
+                  {unassignedCount} unassigned shift
+                  {unassignedCount === 1 ? "" : "s"} — please assign below.
+                </Typography>
+              )}
               <Grid container spacing={1.5}>
                 {assignedStats.map((stat) => (
                   <Grid

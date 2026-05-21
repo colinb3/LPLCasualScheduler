@@ -415,6 +415,43 @@ export default function Shifts({
           `,
           [shiftDateStr, shiftStartStr, shiftEndStr, selectedBranchId],
         );
+
+        // If a schedule already exists for this week, add the new shift
+        // to ScheduleShift as unassigned (casual_id NULL).
+        try {
+          const monday = getWeekStart(selectedWeekDay);
+          if (monday) {
+            const mondayStr = monday.format("YYYY-MM-DD");
+            const scheduleRows = await queryRows<{ id: number }>(
+              `SELECT id FROM Schedule WHERE monday = ?`,
+              [mondayStr],
+            );
+
+            if (scheduleRows.length > 0) {
+              // Find the newly inserted shift by matching its unique fields.
+              const insertedRows = await queryRows<{ id: number }>(
+                `
+                  SELECT id FROM Shift
+                  WHERE date = ? AND start_time = ? AND end_time = ? AND branch_id = ?
+                  ORDER BY id DESC
+                  LIMIT 1
+                `,
+                [shiftDateStr, shiftStartStr, shiftEndStr, selectedBranchId],
+              );
+
+              const insertedShiftId = insertedRows[0]?.id;
+
+              if (insertedShiftId) {
+                await runSql(
+                  `INSERT INTO ScheduleShift (schedule_id, shift_id) VALUES (?, ?)`,
+                  [scheduleRows[0].id, insertedShiftId],
+                );
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to add ScheduleShift for new shift:", err);
+        }
       }
 
       setAddShiftDialogOpen(false);
